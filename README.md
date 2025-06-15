@@ -13,7 +13,6 @@ Aplikasi ini memiliki semua fitur yang dibutuhkan untuk pengelolaan kas dasar:
 * **⚖️ Validasi Saldo:** Sistem secara otomatis mencegah pengguna memasukkan pengeluaran yang melebihi saldo kas yang tersedia.
 * **🔎 Filter Data:** Pengguna dapat dengan mudah memfilter riwayat transaksi untuk menampilkan "Semua", "Hanya Pemasukan", atau "Hanya Pengeluaran".
 * **💾 Penyimpanan Permanen:** Semua data transaksi disimpan secara lokal di dalam perangkat menggunakan database SQLite, sehingga data tidak akan hilang saat aplikasi ditutup.
-* **🎨 Branding Kustom:** Dilengkapi dengan *splash screen* dan ikon aplikasi kustom untuk memberikan identitas yang unik.
 
 
 ## 🛠️ Teknologi & Stack
