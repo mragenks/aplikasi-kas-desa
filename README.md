@@ -1,5 +1,4 @@
-<<<<<<< HEAD
-# aplikasikasdesa
+# Aplikasi Kas Desa Singodutan
 
 A new Flutter project.
 
