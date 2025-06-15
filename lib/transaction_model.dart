@@ -18,4 +18,15 @@ class Transaction {
     required this.type,
     required this.date,
   });
+
+  // Method untuk mengubah objek Transaction menjadi Map
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'description': description,
+      'amount': amount,
+      'type': type.toString(),
+      'date': date.toIso8601String(),
+    };
+  }
 }

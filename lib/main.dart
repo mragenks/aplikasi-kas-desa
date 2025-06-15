@@ -1,25 +1,27 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'dart:io'; // Import untuk cek platform
-import 'package:sqflite_common_ffi/sqflite_ffi.dart'
-    hide Transaction; // Import FFI
+import 'package:sqflite_common_ffi/sqflite_ffi.dart' hide Transaction;
 
 import 'add_transaction_page.dart';
-import 'transaction_model.dart';
 import 'database_helper.dart';
+import 'transaction_model.dart';
+
+// Enum untuk mendefinisikan pilihan filter yang tersedia
+enum FilterType { semua, pemasukan, pengeluaran }
 
 Future<void> main() async {
-  // 1. Ubah main menjadi async
-  // 2. Pastikan Flutter siap sebelum cek platform
+  // Pastikan Flutter siap sebelum cek platform
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 3. Inisialisasi FFI hanya untuk platform desktop
+  // Inisialisasi FFI hanya untuk platform desktop (Windows, Linux, macOS)
   if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
   }
 
-  // 4. Jalankan aplikasi seperti biasa
+  // Jalankan aplikasi
   runApp(const AplikasiKasDesa());
 }
 
@@ -33,6 +35,8 @@ class AplikasiKasDesa extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.teal,
         visualDensity: VisualDensity.adaptivePlatformDensity,
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
+        useMaterial3: true,
       ),
       debugShowCheckedModeBanner: false,
       home: const HomePage(),
@@ -48,62 +52,76 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  // Daftar transaksi sekarang diinisialisasi sebagai list kosong.
-  // Data akan diisi dari database.
-  List<Transaction> _transactions = [];
-
-  // Variabel untuk membantu agar loading tidak berkedip
+  List<Transaction> _allTransactions = []; // Menyimpan SEMUA transaksi
+  List<Transaction> _filteredTransactions = []; // Menyimpan transaksi yang akan ditampilkan
   bool _isLoading = true;
+  FilterType _currentFilter = FilterType.semua;
 
-  // initState adalah method yang dijalankan PERTAMA KALI saat halaman ini dibuat.
-  // Sempurna untuk memuat data awal.
   @override
   void initState() {
     super.initState();
     _refreshTransactions();
   }
 
-  // Method untuk mengambil data dari database dan memperbarui UI
+  // Mengambil data dari database dan menerapkan filter
   Future<void> _refreshTransactions() async {
-    // Kita tambahkan try-catch untuk menangkap error
-    try {
-      print("Mencoba mengambil data dari database...");
-      final data = await DatabaseHelper.instance.getAllTransactions();
-      setState(() {
-        _transactions = data;
-        _isLoading = false; // Hentikan loading jika berhasil
-      });
-      print("Data berhasil diambil. Jumlah transaksi: ${data.length}");
-    } catch (error) {
-      print("--- TERJADI ERROR SAAT MENGAMBIL DATA ---");
-      print(error);
-      print("---------------------------------------");
-      setState(() {
-        _isLoading = false; // Tetap hentikan loading meski ada error
-      });
-    }
+    final allData = await DatabaseHelper.instance.getAllTransactions();
+    _applyFilter(allData); // Panggil method terpisah untuk menerapkan filter
   }
 
-  // Method untuk pindah halaman dan menangani data baru
-  void _goToAddTransactionPage(BuildContext context) async {
-    final result = await Navigator.push(
+  // Menerapkan filter ke data yang ada dan update UI
+  void _applyFilter(List<Transaction> allData) {
+    List<Transaction> filteredData;
+    if (_currentFilter == FilterType.pemasukan) {
+      filteredData = allData.where((tx) => tx.type == TransactionType.pemasukan).toList();
+    } else if (_currentFilter == FilterType.pengeluaran) {
+      filteredData = allData.where((tx) => tx.type == TransactionType.pengeluaran).toList();
+    } else {
+      filteredData = allData;
+    }
+    
+    setState(() {
+      _allTransactions = allData;
+      _filteredTransactions = filteredData;
+      _isLoading = false;
+    });
+  }
+
+  // Navigasi ke halaman TAMBAH data
+  void _navigateAndAddTransaction() async {
+    await Navigator.push(
       context,
       MaterialPageRoute(
-        // KIRIMKAN NILAI SALDO SAAT INI KE HALAMAN TAMBAH
         builder: (context) => AddTransactionPage(currentBalance: _totalBalance),
       ),
     );
-
-    if (result != null && result is Transaction) {
-      await DatabaseHelper.instance.insert(result);
-      _refreshTransactions();
-    }
+    _refreshTransactions();
   }
 
-  // Getter untuk menghitung total saldo
+  // Navigasi ke halaman EDIT data
+  void _navigateAndEditTransaction(Transaction transaction) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddTransactionPage(
+          currentBalance: _totalBalance,
+          existingTransaction: transaction,
+        ),
+      ),
+    );
+    _refreshTransactions();
+  }
+
+  // Logika untuk menghapus transaksi
+  Future<void> _deleteTransaction(String id) async {
+    await DatabaseHelper.instance.delete(id);
+    _refreshTransactions();
+  }
+
+  // Menghitung total saldo SELALU dari semua transaksi
   double get _totalBalance {
     double total = 0.0;
-    for (var tx in _transactions) {
+    for (var tx in _allTransactions) {
       if (tx.type == TransactionType.pemasukan) {
         total += tx.amount;
       } else {
@@ -120,89 +138,135 @@ class _HomePageState extends State<HomePage> {
         title: const Text('Kas Desa Singodutan'),
         backgroundColor: Colors.teal,
         foregroundColor: Colors.white,
+        // Tombol filter di AppBar sudah kita hapus
       ),
-      body: _isLoading // Jika masih loading, tampilkan spinner
+      body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
-                // ... (Kartu Saldo dan Judul Riwayat masih sama)
+                // Kartu Saldo
                 Card(
-                  margin: const EdgeInsets.all(16.0),
+                  margin: const EdgeInsets.fromLTRB(16, 16, 16, 4),
                   elevation: 4.0,
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Saldo Kas Saat Ini',
-                            style: TextStyle(
-                                fontSize: 18.0, color: Colors.black54)),
+                        const Text('Saldo Kas Saat Ini', style: TextStyle(fontSize: 18.0, color: Colors.black54)),
                         const SizedBox(height: 8.0),
                         Text(
-                          NumberFormat.currency(
-                                  locale: 'id_ID',
-                                  symbol: 'Rp ',
-                                  decimalDigits: 0)
-                              .format(_totalBalance),
-                          style: const TextStyle(
-                              fontSize: 32.0,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.teal),
+                          NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0).format(_totalBalance),
+                          style: const TextStyle(fontSize: 32.0, fontWeight: FontWeight.bold, color: Colors.teal),
                         ),
                       ],
                     ),
                   ),
                 ),
+
+                // Kontrol Filter Baru di sini
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      FilterChip(
+                        label: const Text('Semua'),
+                        selected: _currentFilter == FilterType.semua,
+                        onSelected: (selected) {
+                          if (selected) {
+                            setState(() => _currentFilter = FilterType.semua);
+                            _applyFilter(_allTransactions);
+                          }
+                        },
+                      ),
+                      FilterChip(
+                        label: const Text('Pemasukan'),
+                        selected: _currentFilter == FilterType.pemasukan,
+                        onSelected: (selected) {
+                          if (selected) {
+                            setState(() => _currentFilter = FilterType.pemasukan);
+                            _applyFilter(_allTransactions);
+                          }
+                        },
+                      ),
+                      FilterChip(
+                        label: const Text('Pengeluaran'),
+                        selected: _currentFilter == FilterType.pengeluaran,
+                        onSelected: (selected) {
+                          if (selected) {
+                            setState(() => _currentFilter = FilterType.pengeluaran);
+                            _applyFilter(_allTransactions);
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16.0),
                   child: Align(
                     alignment: Alignment.centerLeft,
-                    child: Text('Riwayat Transaksi',
-                        style: TextStyle(
-                            fontSize: 20.0, fontWeight: FontWeight.bold)),
+                    child: Text('Riwayat Transaksi', style: TextStyle(fontSize: 20.0, fontWeight: FontWeight.bold)),
                   ),
                 ),
-                // Jika tidak ada transaksi, tampilkan pesan
-                _transactions.isEmpty
+                
+                _filteredTransactions.isEmpty
                     ? Expanded(
                         child: Center(
                           child: Text(
-                            'Belum ada transaksi.\nTekan tombol + untuk memulai.',
+                            'Tidak ada transaksi untuk ditampilkan.\nUbah filter atau tekan + untuk memulai.',
                             textAlign: TextAlign.center,
-                            style: TextStyle(
-                                fontSize: 16, color: Colors.grey[600]),
+                            style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                           ),
                         ),
                       )
                     : Expanded(
                         child: ListView.builder(
-                          itemCount: _transactions.length,
+                          itemCount: _filteredTransactions.length,
                           itemBuilder: (ctx, index) {
-                            // ... (ListTile masih sama persis seperti sebelumnya)
-                            final tx = _transactions[index];
-                            bool isPemasukan =
-                                tx.type == TransactionType.pemasukan;
-                            return Card(
-                              margin: const EdgeInsets.symmetric(
-                                  horizontal: 16.0, vertical: 4.0),
-                              child: ListTile(
-                                leading: Icon(
-                                    isPemasukan
-                                        ? Icons.arrow_upward
-                                        : Icons.arrow_downward,
-                                    color: isPemasukan
-                                        ? Colors.green
-                                        : Colors.red),
-                                title: Text(tx.description),
-                                subtitle: Text(DateFormat('d MMMM yyyy, HH:mm')
-                                    .format(tx.date)),
-                                trailing: Text(
-                                  '${isPemasukan ? '+' : '-'} ${NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0).format(tx.amount)}',
-                                  style: TextStyle(
-                                      color: isPemasukan
-                                          ? Colors.green
-                                          : Colors.red,
-                                      fontWeight: FontWeight.bold),
+                            final tx = _filteredTransactions[index];
+                            bool isPemasukan = tx.type == TransactionType.pemasukan;
+                            return Dismissible(
+                              key: Key(tx.id),
+                              direction: DismissDirection.endToStart,
+                              background: Container(
+                                color: Colors.red,
+                                padding: const EdgeInsets.symmetric(horizontal: 20),
+                                alignment: Alignment.centerRight,
+                                child: const Icon(Icons.delete, color: Colors.white),
+                              ),
+                              confirmDismiss: (direction) async {
+                                return await showDialog(
+                                  context: context,
+                                  builder: (BuildContext context) {
+                                    return AlertDialog(
+                                      title: const Text("Konfirmasi Hapus"),
+                                      content: Text('Apakah Anda yakin ingin menghapus transaksi "${tx.description}"?'),
+                                      actions: <Widget>[
+                                        TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text("Batal")),
+                                        TextButton(onPressed: () => Navigator.of(context).pop(true), child: const Text("Hapus", style: TextStyle(color: Colors.red))),
+                                      ],
+                                    );
+                                  },
+                                );
+                              },
+                              onDismissed: (direction) {
+                                _deleteTransaction(tx.id);
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${tx.description} telah dihapus')));
+                              },
+                              child: Card(
+                                margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+                                child: ListTile(
+                                  onTap: () => _navigateAndEditTransaction(tx),
+                                  leading: Icon(isPemasukan ? Icons.arrow_upward : Icons.arrow_downward, color: isPemasukan ? Colors.green : Colors.red),
+                                  title: Text(tx.description),
+                                  subtitle: Text(DateFormat('d MMMM y, HH:mm').format(tx.date)),
+                                  trailing: Text(
+                                    '${isPemasukan ? '+' : '-'} ${NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0).format(tx.amount)}',
+                                    style: TextStyle(color: isPemasukan ? Colors.green : Colors.red, fontWeight: FontWeight.bold),
+                                  ),
                                 ),
                               ),
                             );
@@ -212,7 +276,7 @@ class _HomePageState extends State<HomePage> {
               ],
             ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _goToAddTransactionPage(context),
+        onPressed: _navigateAndAddTransaction,
         tooltip: 'Tambah Transaksi',
         backgroundColor: Colors.teal,
         child: const Icon(Icons.add, color: Colors.white),

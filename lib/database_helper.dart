@@ -33,8 +33,7 @@ class DatabaseHelper {
   _initDatabase() async {
     String path = join(await getDatabasesPath(), _databaseName);
     return await openDatabase(path,
-        version: _databaseVersion,
-        onCreate: _onCreate);
+        version: _databaseVersion, onCreate: _onCreate);
   }
 
   // Perintah SQL untuk membuat tabel saat database pertama kali dibuat
@@ -59,9 +58,9 @@ class DatabaseHelper {
       columnDescription: transaction.description,
       columnAmount: transaction.amount,
       // Simpan enum sebagai string
-      columnType: transaction.type.toString(), 
+      columnType: transaction.type.toString(),
       // Simpan DateTime sebagai string format ISO 8601
-      columnDate: transaction.date.toIso8601String(), 
+      columnDate: transaction.date.toIso8601String(),
     };
     return await db.insert(table, row);
   }
@@ -69,7 +68,8 @@ class DatabaseHelper {
   // Method untuk mengambil semua data (Read)
   Future<List<Transaction>> getAllTransactions() async {
     Database db = await instance.database;
-    final List<Map<String, dynamic>> maps = await db.query(table, orderBy: "$columnDate DESC");
+    final List<Map<String, dynamic>> maps =
+        await db.query(table, orderBy: "$columnDate DESC");
 
     // Ubah List<Map> menjadi List<Transaction>
     return List.generate(maps.length, (i) {
@@ -78,12 +78,34 @@ class DatabaseHelper {
         description: maps[i][columnDescription],
         amount: maps[i][columnAmount],
         // Ubah string kembali menjadi enum
-        type: maps[i][columnType] == TransactionType.pemasukan.toString() 
-              ? TransactionType.pemasukan 
-              : TransactionType.pengeluaran,
+        type: maps[i][columnType] == TransactionType.pemasukan.toString()
+            ? TransactionType.pemasukan
+            : TransactionType.pengeluaran,
         // Ubah string ISO 8601 kembali menjadi DateTime
         date: DateTime.parse(maps[i][columnDate]),
       );
     });
+  }
+
+  // Method untuk menghapus data (Delete)
+  Future<int> delete(String id) async {
+    Database db = await instance.database;
+    return await db.delete(
+      table,
+      where:
+          '$columnId = ?', // Gunakan 'where' untuk menentukan item mana yang akan dihapus
+      whereArgs: [id], // Berikan id sebagai argumen untuk keamanan
+    );
+  }
+
+  // Method untuk memperbarui data (Update)
+  Future<int> update(Transaction transaction) async {
+    Database db = await instance.database;
+    return await db.update(
+      table,
+      transaction.toMap(), // Data baru
+      where: '$columnId = ?',
+      whereArgs: [transaction.id],
+    );
   }
 }
