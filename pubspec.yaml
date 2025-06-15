@@ -51,6 +51,10 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^4.0.0
 
+  flutter_native_splash: ^2.4.0
+
+  flutter_launcher_icons: ^0.13.1
+
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
@@ -61,6 +65,9 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  assets:
+    - assets/images/
 
   # To add assets to your application, add an assets section, like this:
   # assets:
@@ -92,3 +99,21 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+# Tambahkan bagian ini di akhir file pubspec.yaml
+flutter_native_splash:
+  # Warna latar belakang splash screen Anda
+  color: "#FFFFFF"  # Putih
+  
+  # Path menuju file logo Anda
+  image: assets/images/logo.png
+  
+  # Aktifkan untuk Android dan iOS
+  android: true
+  ios: true
+
+# Tambahkan bagian ini di akhir file pubspec.yaml
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/images/logo.png" # Gunakan logo yang sama
